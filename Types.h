@@ -7,4 +7,11 @@ namespace Core
         RESULT_OK = 0,
         NULL_PTR = 1,
     };
+
+    const enum COLORS
+    {
+        WHITE = 255,
+        BLACK = 0,
+        THRESHOLD = 127
+    };
 }

@@ -75,6 +75,12 @@ int Ditherer::sierraLiteDither(std::string imageFile)
     int colCounter = 0;
     int currentRow = 0;
 
+    // these will be used for the dithering colors
+    int newColor = 0;
+    int remainder;
+    int blendingFactor;
+
+
     // log beginning of scan 
     printf("[SIERRA-LITE DITHERER] : Beginning Scan...\n");
 
@@ -111,13 +117,29 @@ int Ditherer::sierraLiteDither(std::string imageFile)
                 }
 
                 // we have the pixel neiighbor hood now we can dither them
+                // first find out what the current pixel is close to, black or white
+                newColor = pixelCurrent > COLORS::THRESHOLD ? COLORS::WHITE : COLORS::BLACK;
+                remainder = (int)pixelCurrent;
+                blendingFactor = floor(remainder / divisor);
+
+                // write that new color to the image
+                // TODO
+
+                // now we figure out the adjusted values of the neighboring pixels
+                for (auto &value : ditherMatrix)
+                {
+                    // multiply the value in the dither mat with the blending factor
+                    newColor = (value.blendVal() * blendingFactor) > COLORS::THRESHOLD ? COLORS::WHITE : COLORS::BLACK;
+
+                    // write the new color to the approprate place
+                    // TODO (use coordinate.x/y to write them to the correct positions)
+                }
             }
         }
     }
 
-    // log end of scan 
+    // log end of image scan 
     printf("[SIERRA-LITE DITHERER] : Scan Complete!\n");
-
     return RETURN_CODES::RESULT_OK;
 }
 
