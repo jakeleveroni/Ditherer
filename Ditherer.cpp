@@ -3,6 +3,7 @@
 #include "Types.h"
 
 using namespace PostProcessing;
+using namespace Core;
 
 Ditherer::Ditherer()
 {
@@ -35,15 +36,15 @@ int Ditherer::sierraLiteDither(std::string imageFile)
     int nRows, nCols;
 
     // matrix for dithering and value of divisor
-    std::vector<Core::Coordinate> ditherMatrix;
+    std::vector<Coordinate> ditherMatrix;
     uint divisor = 4;
 
     // push valid matrix locations onto the ditherMatrix 
     // relative to current pixel position
-    ditherMatrix.push_back(Core::Coordinate(0, 0, 0));
-    ditherMatrix.push_back(Core::Coordinate(1, 0, 2));
-    ditherMatrix.push_back(Core::Coordinate(-1, 1, 1));
-    ditherMatrix.push_back(Core::Coordinate(0, 1, 1));
+    ditherMatrix.push_back(Coordinate(0, 0, 0));
+    ditherMatrix.push_back(Coordinate(1, 0, 2));
+    ditherMatrix.push_back(Coordinate(-1, 1, 1));
+    ditherMatrix.push_back(Coordinate(0, 1, 1));
 
     // now open up the image in single channel grayscale 
     cv::Mat image = cv::imread(imageFile, cv::IMREAD_GRAYSCALE);
@@ -52,8 +53,8 @@ int Ditherer::sierraLiteDither(std::string imageFile)
     // verify image was read correctly if not log error and exit
     if (!image.data)
     {
-        printf("\t[ERROR]: Image was not opened succesfully.\n");
-        return Core::ReturnCodes::INVALID_FILE;
+        printf("[ERROR]: Image was not opened succesfully.\n");
+        return RETURN_CODES::INVALID_FILE;
     }
 
     // get the rows and columns
@@ -61,60 +62,63 @@ int Ditherer::sierraLiteDither(std::string imageFile)
     nRows = image.rows;
     nCols = image.cols * channels;
 
-    // check if the image is stored continuously and if so 
-    // set the rows and columns accordingly
-    if (image.isContinuous())
-    {
-        nCols *= nRows;
-        nRows = 1;
-    }
-
     // create empty image header that will be written to with the 
     // final dithered version of the image
     cv::Mat* ditheredImage(&image);
 
     // these will be used to store the pixels that will be dithered
     uchar pixelCurrent, pixel1, pixel2, pixel3;
-    uchar *pixelRow, *nextPixelRow;
+    uchar *pixelRow;
 
+    // These will be used to tell what row were on in a 
+    // continuous Mat
+    int colCounter = 0;
+    int currentRow = 0;
+
+    // log beginning of scan 
+    printf("[SIERRA-LITE DITHERER] : Beginning Scan...\n");
 
     // Case: The Mat is continuous (1D array)
-    if (image.isContinuous)
+    // we will map 2D array coordinates to 1D array
+    if (image.isContinuous())
     {
-        for (int i = 0; i < nRows; ++i)
+        // loop through rows
+        for (int rowIndex = 0; rowIndex < nRows; ++rowIndex)
         {
-            // get the current and next row of pixels
-            pixelRow = image.ptr<uchar>(i);
+            // get the only row of pixels
+            pixelRow = image.ptr<uchar>(0);
 
-            for (int j = 0; j < nCols; ++j) // NOTE : Verify if you need to increment column by more than 1 
+            for (int colIndex = 0; colIndex < nCols; ++colIndex) // NOTE : Verify if you need to increment column by more than 1 
             {
-                // get current pixel
-                pixelCurrent = pixelRow[j];
-                printf("\t[CURRENT PIXEL] : %u\n", (uint)pixelCurrent);
+                // Get the current pixel 
+                pixelCurrent = pixelRow[nCols * rowIndex + colIndex];
 
-                // get pixel at matrix position 1
-                if ((j + 1) < nCols)
+                // get the pixel to the right of the current pixel
+                if ((colIndex + 1) < nCols)
                 {
-                    pixel1 = pixelRow[j + 1];
-                    printf("\t[PIXEL 1] : %u\n", (uint)pixel1);
+                    pixel1 = pixelRow[nCols * rowIndex + colIndex + 1];
                 }
-                // get pixel at matrix position 2
-                else if ((j - 1) > 0)
+                // get the pixel down one row and one to the left of the current pixel
+                else if ((rowIndex + 1) < nRows)
                 {
-                    pixel2 = pixelRow[nCols *  - 1];
-                    printf("\t[PIXEL 2] : %u\n", (uint)pixel2);
+                    if (((colIndex - 1) >= 0))
+                    {
+                        pixel2 = pixelRow[nCols * (rowIndex + 1) + colIndex - 1];
+                    }
+
+                    // Get the pixel directly below the current pixel
+                    pixel3 = pixelRow[nCols * (rowIndex + 1) + colIndex];
                 }
-                // get pixel at matrix position 3
-                else if (nextPixelRow != NULL)
-                {
-                    pixel3 = pixelRow[j];
-                    printf("\t[PIXEL 3] : %u\n", (uint)pixel3);
-                }
+
+                // we have the pixel neiighbor hood now we can dither them
             }
         }
     }
-   
-    return Core::ReturnCodes::RESULT_OK;
+
+    // log end of scan 
+    printf("[SIERRA-LITE DITHERER] : Scan Complete!\n");
+
+    return RETURN_CODES::RESULT_OK;
 }
 
 void Ditherer::updateDitherType(std::string type)

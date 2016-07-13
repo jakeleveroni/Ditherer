@@ -1,7 +1,7 @@
 #pragma once
 namespace Core
 {
-    const enum ReturnCodes
+    const enum RETURN_CODES
     {
         INVALID_FILE = -1,
         RESULT_OK = 0,
