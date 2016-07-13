@@ -75,45 +75,45 @@ int Ditherer::sierraLiteDither(std::string imageFile)
 
     // these will be used to store the pixels that will be dithered
     uchar pixelCurrent, pixel1, pixel2, pixel3;
+    uchar *pixelRow, *nextPixelRow;
 
-    // TODO there is a difference on how iteration will work if 
-    // the Mat is continuous or not
 
-    // iterate through the rows and columns from 
-    // top-to-bottom and left-to-right
-    for (int i = 0; i < nRows; ++i)
+    // Case: The Mat is continuous (1D array)
+    if (image.isContinuous)
     {
-        for (int j = 0; j < nCols; ++j) // NOTE : Verify if you need to increment column by more than 1 
+        for (int i = 0; i < nRows; ++i)
         {
-            // get the values of the necessary pixels at the 
-            // current position at function does not bound check 
-            // unless in debug mode so manual bounds checking is necessary
-            if (i < nRows && j < nCols)
+            // get the current and next row of pixels
+            pixelRow = image.ptr<uchar>(i);
+
+            for (int j = 0; j < nCols; ++j) // NOTE : Verify if you need to increment column by more than 1 
             {
-                printf("[HERE! 1]");
-                pixelCurrent = image.at<uchar>(i, j);
+                // get current pixel
+                pixelCurrent = pixelRow[j];
                 printf("\t[CURRENT PIXEL] : %u\n", (uint)pixelCurrent);
-            }
-            else if (i < nRows && (j + 1) < nCols)
-            {
-                printf("[HERE! 2]");
-                pixel1 = image.at<uchar>(i, j + 1);
-                printf("\t[PIXEL 1] : %u\n", (uint)pixel1);
-            }
-            else if ((i + 1) < nRows && (j - 1) > 0)
-            {
-                printf("[HERE! 3]");
-                pixel2 = image.at<uchar>(i + 1, j - 1);
-                printf("\t[PIXEL 2] : %u\n", (uint)pixel2);
-            }
-            else if ((i + 1) < nRows && (j + 1) < nCols)
-            {
-                printf("[HERE! 4]");
-                pixel3 = image.at<uchar>(i + 1, j + 1);
-                printf("\t[PIXEL 3] : %u\n", (uint)pixel3);
+
+                // get pixel at matrix position 1
+                if ((j + 1) < nCols)
+                {
+                    pixel1 = pixelRow[j + 1];
+                    printf("\t[PIXEL 1] : %u\n", (uint)pixel1);
+                }
+                // get pixel at matrix position 2
+                else if ((j - 1) > 0)
+                {
+                    pixel2 = pixelRow[nCols *  - 1];
+                    printf("\t[PIXEL 2] : %u\n", (uint)pixel2);
+                }
+                // get pixel at matrix position 3
+                else if (nextPixelRow != NULL)
+                {
+                    pixel3 = pixelRow[j];
+                    printf("\t[PIXEL 3] : %u\n", (uint)pixel3);
+                }
             }
         }
     }
+   
     return Core::ReturnCodes::RESULT_OK;
 }
 
