@@ -13,6 +13,7 @@ namespace Core
         {
             xPos = x;
             yPos = y;
+			blendingCoef = blend;
         }
 
         int x()

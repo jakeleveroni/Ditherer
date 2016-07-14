@@ -5,19 +5,18 @@
 
 int main(int argc, char** argv)
 {
-    std::string imageFile = "assets/cat.jpg";
+	PostProcessing::Ditherer* ditherer = new PostProcessing::Ditherer();
+	std::string imageFile = "assets/cat.jpg";
+
+	// dispaly original image
+	//cv::Mat image = imread(imageFile, cv::IMREAD_GRAYSCALE);
+	//cv::namedWindow("Original Image", cv::WINDOW_AUTOSIZE);
+	//cv::imshow("Original Image", image);
+	//cv::waitKey(0);
     
-    PostProcessing::Ditherer* ditherer = new PostProcessing::Ditherer();
-    
-    ditherer->sierraLiteDither(imageFile);
-
-    char x = ' ';
-
-    while (x != 'q')
-    {
-        std::cin >> x;
-    }
-
+	// Display the dithered image
+    cv::Mat ditherImage = ditherer->sierraLiteDither(imageFile);
+	ditherer->displayDitheredImage(ditherImage);
 
     return 0;
 }
