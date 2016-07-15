@@ -27,8 +27,8 @@ cv::Mat Ditherer::sierra2Dither(std::string imageFile)
 
 /*
 // Uses a matrix of the form where X is the current pixel
-//		| 0   X   2 |
-//      | 1   1   0 |
+//		| NA   X   2  |
+//      | 1    1   NA |
 // with a divisor of 1/4
 */
 cv::Mat Ditherer::sierraLiteDither(std::string imageFile)
@@ -39,13 +39,6 @@ cv::Mat Ditherer::sierraLiteDither(std::string imageFile)
     // matrix for dithering and value of divisor
     std::vector<Coordinate> ditherMatrix;
     uint divisor = 4;
-
-    // push valid matrix locations onto the ditherMatrix 
-    // relative to current pixel position
-    ditherMatrix.push_back(Coordinate(0, 0, 0));
-    ditherMatrix.push_back(Coordinate(1, 0, 2));
-    ditherMatrix.push_back(Coordinate(-1, 1, 1));
-    ditherMatrix.push_back(Coordinate(0, 1, 1));
 
     // now open up the image in single channel grayscale 
     cv::Mat image = cv::imread(imageFile, cv::IMREAD_GRAYSCALE);
@@ -63,9 +56,12 @@ cv::Mat Ditherer::sierraLiteDither(std::string imageFile)
     nRows = image.rows;
     nCols = image.cols * channels;
 
+	// create output imafge 
+	cv::Mat outputImage = image.clone();
+
     // these will be used to store the pixels that will be dithered
-    uchar currentColor;
-    uchar *pixelRow;
+    int currentColor;
+    uchar *pixelRow, *outputPixelRow;
 
     // these will be used for the dithering colors
     int blendingFactor;
@@ -79,65 +75,210 @@ cv::Mat Ditherer::sierraLiteDither(std::string imageFile)
     // we will map 2D array coordinates to 1D array
     if (image.isContinuous())
     {
-		// loop through rows
-        for (int rowIndex = 0; rowIndex < nRows; ++rowIndex)
-        {
-			// get the only row of pixels
+		// create vector for storing values
+		std::vector<std::vector<int> > lookupTable;
+		lookupTable.resize(nRows, std::vector<int>(nCols));
+
+		std::vector<std::vector<int> > ditheredTable(lookupTable);
+
+		for (int rNdx = 0; rNdx < nRows; ++rNdx)
+		{
+			// get the pixels from the continuous image
 			pixelRow = image.ptr<uchar>(0);
 
-            for (int colIndex = 0; colIndex < nCols; ++colIndex) // NOTE : Verify if you need to increment column by more than 1 
-            {
-                // Get the current pixel 
-				currentColor = pixelRow[nCols * rowIndex + colIndex];
-	
-				// dither current pixel and get the error quantum 
-				newColor = currentColor > COLORS::THRESHOLD ? COLORS::WHITE : COLORS::BLACK;
+			for (int cNdx = 0; cNdx < nCols; ++cNdx)
+			{
+				// load pixel values into vector
+				lookupTable[rNdx][cNdx] = pixelRow[nCols * rNdx + cNdx];
+			}
+		}
 
-				// make sure not to apply dithering to already dithered pixels
-				if(pixelRow[nCols * rowIndex + colIndex] != 0 && pixelRow[nCols * rowIndex + colIndex] == 1)
+		// now apply dithering to the vectors values TODO change to looping with iterators
+		for (int rNdx = 0; rNdx < nRows; ++rNdx)
+		{
+			for (int cNdx = 0; cNdx < nCols; ++cNdx)
+			{
+				// handle negative pixel values
+				currentColor = lookupTable[rNdx][cNdx];
+
+				// get quantum 
+				quantumError = (lookupTable[rNdx][cNdx] > COLORS::THRESHOLD) ? (currentColor - COLORS::WHITE) : currentColor;
+
+				if (quantumError < 0)
 				{
-					pixelRow[nCols * rowIndex + colIndex] = newColor;
-					quantumError = currentColor - newColor;
+					quantumError *= -1;
 				}
 
-                // bounds checking to the right of the pixel
-                if ((colIndex + 1) < nCols)
-                {
-					// dont apply to dithered pixels
-					if (pixelRow[nCols * rowIndex + colIndex + 1] != 0 && pixelRow[nCols * rowIndex + colIndex + 1] != 1)
-					{
-						// dither the pixel to the right of the current pixel
-						pixelRow[nCols * rowIndex + colIndex + 1] = (ditherMatrix[1].blendVal() * quantumError / divisor) > COLORS::THRESHOLD ? COLORS::WHITE : COLORS::BLACK;
-					}
-                }
-                // bounds checking for below the pixel
-				else if ((rowIndex + 1) < nRows)
+				// save current pixel
+				ditheredTable[rNdx][cNdx] = currentColor > COLORS::THRESHOLD ? COLORS::WHITE : COLORS::BLACK;
+
+				// bounds checking
+				if (cNdx + 1 < nCols)
 				{
-					// bounds checking for below and to the left of the pixel
-					if (((colIndex - 1) >= 0))
+					ditheredTable[rNdx][cNdx + 1] = (lookupTable[rNdx][cNdx + 1]) + (quantumError * (SIERRALITE::SL_ONE / divisor))
+						> COLORS::THRESHOLD ? COLORS::WHITE : COLORS::BLACK;
+				}
+
+				// bounds checking 
+				if (rNdx + 1 < nRows)
+				{
+					if (cNdx > 0)
 					{
-						// dont apply to dithered pixels
-						if (pixelRow[nCols * (rowIndex + 1) + colIndex - 1] != 0 && pixelRow[nCols * rowIndex + colIndex + 1] != 1)
-						{
-							// dither the pixel to the bottom and left of the current pixel
-							pixelRow[nCols * (rowIndex + 1) + colIndex - 1] = (ditherMatrix[1].blendVal() * quantumError / divisor) > COLORS::THRESHOLD ? COLORS::WHITE : COLORS::BLACK;
-						}
+						ditheredTable[rNdx + 1][cNdx - 1] = (lookupTable[rNdx + 1][cNdx - 1]) + (quantumError * (SIERRALITE::SL_TWO / divisor))
+							> COLORS::THRESHOLD ? COLORS::WHITE : COLORS::BLACK;
 					}
 
-					// dont apply to dithered pixels
-					if (pixelRow[nCols * (rowIndex + 1) + colIndex] != 0 && pixelRow[nCols * rowIndex + colIndex + 1] != 1)
-					{
-						// dither the pixel to the bottom of the current pixel
-						pixelRow[nCols * (rowIndex + 1) + colIndex] = (ditherMatrix[1].blendVal() * quantumError / divisor) > COLORS::THRESHOLD ? COLORS::WHITE : COLORS::BLACK;
-					}
+					ditheredTable[rNdx + 1][cNdx] = (lookupTable[rNdx + 1][cNdx]) + (quantumError * (SIERRALITE::SL_THREE / divisor))
+					> COLORS::THRESHOLD ? COLORS::WHITE : COLORS::BLACK;
 				}
-            }
-        }
+			}
+		}
+
+		// write the lookupTable back to the new image
+		outputPixelRow = outputImage.ptr<uchar>(0);
+
+		for (int rNdx = 0; rNdx < nRows; ++rNdx)
+		{
+			for (int cNdx = 0; cNdx < nCols; ++cNdx)
+			{
+				// load pixel values into vector
+				outputPixelRow[nCols * rNdx + cNdx] = ditheredTable[rNdx][cNdx];
+			}
+		}
     }
 
     // log end of image scan 
     printf("[SIERRA-LITE DITHERER] : Scan Complete!\n");
-    return image;
+    return outputImage;
+}
+
+
+// Dithers using the Floyd Steinberg matrix
+cv::Mat Ditherer::floydDither(std::string imageFile)
+{
+	// used to traverse the image
+	int nRows, nCols;
+
+	// matrix for dithering and value of divisor
+	std::vector<Coordinate> ditherMatrix;
+	uint divisor = 16;
+
+	// now open up the image in single channel grayscale 
+	cv::Mat image = cv::imread(imageFile, cv::IMREAD_GRAYSCALE);
+
+
+	// verify image was read correctly if not log error and exit
+	if (!image.data)
+	{
+		printf("[ERROR]: Image was not opened succesfully.\n");
+		return image;
+	}
+
+	// get the rows and columns
+	int channels = image.channels();
+	nRows = image.rows;
+	nCols = image.cols * channels;
+
+	// create output imafge 
+	cv::Mat outputImage = image.clone();
+
+	// these will be used to store the pixels that will be dithered
+	int currentColor;
+	uchar *pixelRow, *outputPixelRow;
+
+	// these will be used for the dithering colors
+	int blendingFactor;
+	int newColor;
+	int quantumError = 0;
+
+	// log beginning of scan 
+	printf("[SIERRA-LITE DITHERER] : Beginning Scan...\n");
+
+	// Case: The Mat is continuous (1D array)
+	// we will map 2D array coordinates to 1D array
+	if (image.isContinuous())
+	{
+		// create vector for storing values
+		std::vector<std::vector<int> > lookupTable;
+		lookupTable.resize(nRows, std::vector<int>(nCols));
+
+		std::vector<std::vector<int> > ditheredTable(lookupTable);
+
+		for (int rNdx = 0; rNdx < nRows; ++rNdx)
+		{
+			// get the pixels from the continuous image
+			pixelRow = image.ptr<uchar>(0);
+
+			for (int cNdx = 0; cNdx < nCols; ++cNdx)
+			{
+				// load pixel values into vector
+				lookupTable[rNdx][cNdx] = pixelRow[nCols * rNdx + cNdx];
+			}
+		}
+
+		// now apply dithering to the vectors values TODO change to looping with iterators
+		for (int rNdx = 0; rNdx < nRows; ++rNdx)
+		{
+			for (int cNdx = 0; cNdx < nCols; ++cNdx)
+			{
+				// handle negative pixel values
+				currentColor = lookupTable[rNdx][cNdx];
+
+				// get quantum 
+				quantumError = (lookupTable[rNdx][cNdx] > COLORS::THRESHOLD) ? (currentColor - COLORS::WHITE) : currentColor;
+
+				if (quantumError < 0)
+				{
+					quantumError *= -1;
+				}
+
+				// save current pixel
+				ditheredTable[rNdx][cNdx] = currentColor > COLORS::THRESHOLD ? COLORS::WHITE : COLORS::BLACK;
+
+				// bounds checking
+				if (cNdx + 1 < nCols)
+				{
+					if (rNdx + 1 < nRows)
+					{
+						ditheredTable[rNdx + 1][cNdx + 1] = (lookupTable[rNdx + 1][cNdx + 1]) + (quantumError * (FLOYD::F_FOUR / divisor))
+					> COLORS::THRESHOLD ? COLORS::WHITE : COLORS::BLACK;
+					}
+
+					ditheredTable[rNdx][cNdx + 1] = (lookupTable[rNdx][cNdx + 1]) + (quantumError * (FLOYD::F_ONE / divisor))
+						> COLORS::THRESHOLD ? COLORS::WHITE : COLORS::BLACK;
+				}
+
+				// bounds checking 
+				if (rNdx + 1 < nRows)
+				{
+					if (cNdx > 0)
+					{
+						ditheredTable[rNdx + 1][cNdx - 1] = (lookupTable[rNdx + 1][cNdx - 1]) + (quantumError * (FLOYD::F_TWO / divisor))
+							> COLORS::THRESHOLD ? COLORS::WHITE : COLORS::BLACK;
+					}
+
+					ditheredTable[rNdx + 1][cNdx] = (lookupTable[rNdx + 1][cNdx]) + (quantumError * (FLOYD::F_THREE / divisor))
+						> COLORS::THRESHOLD ? COLORS::WHITE : COLORS::BLACK;
+				}
+			}
+		}
+
+		// write the lookupTable back to the new image
+		outputPixelRow = outputImage.ptr<uchar>(0);
+
+		for (int rNdx = 0; rNdx < nRows; ++rNdx)
+		{
+			for (int cNdx = 0; cNdx < nCols; ++cNdx)
+			{
+				// load pixel values into vector
+				outputPixelRow[nCols * rNdx + cNdx] = ditheredTable[rNdx][cNdx];
+			}
+		}
+	}
+
+	// log end of image scan 
+	printf("[SIERRA-LITE DITHERER] : Scan Complete!\n");
+	return outputImage;
 }
 
 

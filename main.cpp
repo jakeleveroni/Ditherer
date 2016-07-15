@@ -15,7 +15,7 @@ int main(int argc, char** argv)
 	//cv::waitKey(0);
     
 	// Display the dithered image
-    cv::Mat ditherImage = ditherer->sierraLiteDither(imageFile);
+    cv::Mat ditherImage = ditherer->floydDither(imageFile);
 	ditherer->displayDitheredImage(ditherImage);
 
     return 0;

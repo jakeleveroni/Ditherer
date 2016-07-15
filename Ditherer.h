@@ -15,6 +15,7 @@ namespace PostProcessing
         // Seirra Dithering techniques
         cv::Mat sierra2Dither(std::string imageFile);
         cv::Mat sierraLiteDither(std::string imageFile);
+		cv::Mat floydDither(std::string imageFile);
 		void displayDitheredImage(cv::Mat image);
 
         // updates the active dithering selection
